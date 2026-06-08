@@ -8,17 +8,12 @@ const zglfw = Backend.zglfw;
 // errors are handled.
 pub const opengl_error_handling = zgl.ErrorHandling.assert;
 
-var window: *zglfw.Window = undefined;
-
 pub fn main(main_init: std.process.Init) !void {
     if (dvui.render_backend.kind != .opengl) @compileError("unsupported renderer");
 
     try zglfw.init();
 
-    setupWindowHints();
-
-    window = try zglfw.Window.create(600, 400, "Hello World", null);
-
+    const window = try createWindow("Hello World");
     zglfw.makeContextCurrent(window);
     zglfw.swapInterval(1);
 
@@ -55,7 +50,7 @@ fn getProcAddressWrapper(_: void, symbol_name: [:0]const u8) ?*const anyopaque {
     return zglfw.getProcAddress(symbol_name);
 }
 
-fn setupWindowHints() void {
+fn createWindow(title: [:0]const u8) !*zglfw.Window {
     zglfw.windowHint(.context_version_major, 3);
     zglfw.windowHint(.context_version_minor, 3);
     zglfw.windowHint(.opengl_profile, .opengl_core_profile);
@@ -72,4 +67,5 @@ fn setupWindowHints() void {
     zglfw.windowHint(.maximized, true);
 
     zglfw.windowHint(.doublebuffer, true); // Optional
+    return try zglfw.Window.create(600, 400, title, null);
 }
