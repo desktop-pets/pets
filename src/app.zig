@@ -11,42 +11,18 @@ pub const opengl_error_handling = zgl.ErrorHandling.assert;
 var window: *zglfw.Window = undefined;
 
 pub fn main(main_init: std.process.Init) !void {
-    // I'm keeping demo as I might want to do something with it in the future
-    dvui.Examples.show_demo_window = false;
-
     if (dvui.render_backend.kind != .opengl) @compileError("unsupported renderer");
 
     try zglfw.init();
 
-    zglfw.windowHint(.context_version_major, 3);
-    zglfw.windowHint(.context_version_minor, 3);
-    zglfw.windowHint(.opengl_profile, .opengl_core_profile);
-    zglfw.windowHint(.client_api, .opengl_api);
-
-    // Hints needed for overlay behavior
-    zglfw.windowHint(.mouse_passthrough, true);
-    zglfw.windowHint(.floating, true);
-    zglfw.windowHint(.transparent_framebuffer, true);
-    zglfw.windowHint(.resizable, false);
-    zglfw.windowHint(.decorated, false);
-    zglfw.windowHint(.focused, false);
-    zglfw.windowHint(.focus_on_show, false);
-    zglfw.windowHint(.maximized, true);
-    // Optional
-    zglfw.windowHint(.doublebuffer, true);
+    setupWindowHints();
 
     window = try zglfw.Window.create(600, 400, "Hello World", null);
 
     zglfw.makeContextCurrent(window);
     zglfw.swapInterval(1);
 
-    const ns = struct {
-        fn getProcAddressWrapper(_: void, symbol_name: [:0]const u8) ?*const anyopaque {
-            return zglfw.getProcAddress(symbol_name);
-        }
-    };
-
-    zgl.loadExtensions({}, ns.getProcAddressWrapper) catch |err| {
+    zgl.loadExtensions({}, getProcAddressWrapper) catch |err| {
         std.debug.print("[GL] zgl.loadExtensions: {s} — some GL >4.1 functions are unavailable on this driver (harmless: we don't use them; only core GL 3.3/4.1 is required)\n", .{@errorName(err)});
     };
 
@@ -70,11 +46,30 @@ pub fn main(main_init: std.process.Init) !void {
         impl.addAllEvents(&win);
         try win.begin(impl.nanoTime());
 
-        // only shows the demo if dvui.Examples.show_demo_window is true
-        // .full -> .lite or comment out to speed up compile times
-        dvui.Examples.demo(.lite);
-
         _ = try win.end(.{ .manage_backend = false });
         window.swapBuffers();
     }
+}
+
+fn getProcAddressWrapper(_: void, symbol_name: [:0]const u8) ?*const anyopaque {
+    return zglfw.getProcAddress(symbol_name);
+}
+
+fn setupWindowHints() void {
+    zglfw.windowHint(.context_version_major, 3);
+    zglfw.windowHint(.context_version_minor, 3);
+    zglfw.windowHint(.opengl_profile, .opengl_core_profile);
+    zglfw.windowHint(.client_api, .opengl_api);
+
+    // Hints needed for overlay behavior
+    zglfw.windowHint(.mouse_passthrough, true);
+    zglfw.windowHint(.floating, true);
+    zglfw.windowHint(.transparent_framebuffer, true);
+    zglfw.windowHint(.resizable, false);
+    zglfw.windowHint(.decorated, false);
+    zglfw.windowHint(.focused, false);
+    zglfw.windowHint(.focus_on_show, false);
+    zglfw.windowHint(.maximized, true);
+
+    zglfw.windowHint(.doublebuffer, true); // Optional
 }
