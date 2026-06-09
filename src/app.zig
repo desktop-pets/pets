@@ -1,71 +1,67 @@
 const std = @import("std");
 const dvui = @import("dvui");
-const Backend = @import("glfw-backend");
-const zgl = @import("zgl");
-const zglfw = Backend.zglfw;
+const RaylibBackend = @import("raylib-zig-backend");
+pub const rl = @import("raylib");
+pub const raygui = @import("raygui");
 
-// This can optionally be added in source file to manage how opengl
-// errors are handled.
-pub const opengl_error_handling = zgl.ErrorHandling.assert;
+comptime {
+    std.debug.assert(@hasDecl(RaylibBackend, "RaylibBackend"));
+}
 
-pub fn main(main_init: std.process.Init) !void {
-    if (dvui.render_backend.kind != .opengl) @compileError("unsupported renderer");
+const window_icon_png = @embedFile("zig-favicon.png");
 
-    try zglfw.init();
+pub fn main(init: std.process.Init) !void {
+    if (@import("builtin").os.tag == .windows) {
+        try dvui.Backend.Common.windowsAttachConsole();
+    }
 
-    const window = try createWindow("Hello World");
-    zglfw.makeContextCurrent(window);
-    zglfw.swapInterval(1);
+    rl.setConfigFlags(.{
+        .borderless_windowed_mode = true,
+        .vsync_hint = true,
+        // .window_hidden = dvui.accesskit_enabled,
+        .window_mouse_passthrough = true,
+        .window_unfocused = true,
+        .window_maximized = true,
+        .window_transparent = true,
+        .window_undecorated = true,
+        .window_topmost = true,
+        .window_resizable = true,
+        .fullscreen_mode = false,
+    });
 
-    zgl.loadExtensions({}, getProcAddressWrapper) catch |err| {
-        std.debug.print("[GL] zgl.loadExtensions: {s} — some GL >4.1 functions are unavailable on this driver (harmless: we don't use them; only core GL 3.3/4.1 is required)\n", .{@errorName(err)});
-    };
+    rl.initWindow(800, 600, "Desktop Pets");
+    defer rl.closeWindow();
 
-    var renderer = try dvui.render_backend.init(main_init.gpa, zglfw.getProcAddress, "330");
-    defer renderer.deinit();
+    var backend = RaylibBackend.init(init.io, init.gpa);
+    defer backend.deinit();
 
-    var impl = Backend.init(main_init.io, main_init.gpa, window);
-    defer impl.deinit();
-
-    const backend = dvui.Backend.init(&impl, &renderer);
-    var win = try dvui.Window.init(@src(), main_init.gpa, backend, .{});
+    var win = try dvui.Window.init(@src(), init.gpa, backend.backend(), .{});
     defer win.deinit();
 
-    while (!window.shouldClose()) {
-        zglfw.pollEvents();
+    const bg_color = rl.colorAlpha(.black, 0.0);
+    const border_margin = 1;
 
-        zgl.clearColor(0, 0, 0, 0.2);
-        zgl.clear(.{ .color = true });
+    // Make sure window is maximized
+    rl.minimizeWindow();
+    rl.restoreWindow();
 
-        // This needs to be called after pollEvents and before or just after win.begin
-        impl.addAllEvents(&win);
-        try win.begin(impl.nanoTime());
+    while (!rl.windowShouldClose()) {
+        rl.beginDrawing();
+        rl.clearBackground(bg_color);
 
+        try win.begin(win.backend.nanoTime());
+        {
+            var b = dvui.box(@src(), .{}, .{ .expand = .horizontal, .margin = .{ .x = 10, .y = 10 } });
+            defer b.deinit();
+
+            dvui.label(@src(), "dvui works!", .{}, .{});
+        }
+
+        rl.drawRectangleLines(border_margin, border_margin, rl.getRenderWidth() - border_margin, rl.getRenderHeight() - border_margin, .red);
         _ = try win.end(.{ .manage_backend = false });
-        window.swapBuffers();
+
+        rl.drawRectangle(100, 100, 100, 100, .sky_blue);
+
+        rl.endDrawing();
     }
-}
-
-fn getProcAddressWrapper(_: void, symbol_name: [:0]const u8) ?*const anyopaque {
-    return zglfw.getProcAddress(symbol_name);
-}
-
-fn createWindow(title: [:0]const u8) !*zglfw.Window {
-    zglfw.windowHint(.context_version_major, 3);
-    zglfw.windowHint(.context_version_minor, 3);
-    zglfw.windowHint(.opengl_profile, .opengl_core_profile);
-    zglfw.windowHint(.client_api, .opengl_api);
-
-    // Hints needed for overlay behavior
-    zglfw.windowHint(.mouse_passthrough, true);
-    zglfw.windowHint(.floating, true);
-    zglfw.windowHint(.transparent_framebuffer, true);
-    zglfw.windowHint(.resizable, false);
-    zglfw.windowHint(.decorated, false);
-    zglfw.windowHint(.focused, false);
-    zglfw.windowHint(.focus_on_show, false);
-    zglfw.windowHint(.maximized, true);
-
-    zglfw.windowHint(.doublebuffer, true); // Optional
-    return try zglfw.Window.create(600, 400, title, null);
 }
