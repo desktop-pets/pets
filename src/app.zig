@@ -1,34 +1,9 @@
 const std = @import("std");
-const dvui = @import("dvui");
-const RaylibBackend = @import("raylib-zig-backend");
-pub const rl = @import("raylib");
-pub const raygui = @import("raygui");
-pub const known_folders = @import("known-folders");
+const rl = @import("raylib");
+const raygui = @import("raygui");
 
-comptime {
-    std.debug.assert(@hasDecl(RaylibBackend, "RaylibBackend"));
-}
+const AppConfig = @import("config.zig").AppConfig;
 
-const AppConfig = struct {
-    title: [:0]const u8,
-    data_dir: [:0]const u8,
-    allocator: std.mem.Allocator,
-
-    pub fn init(allocator: std.mem.Allocator, io: std.Io, environ: *const std.process.Environ.Map, name: [:0]const u8) !AppConfig {
-        const root_dir = (try known_folders.getPath(io, allocator, environ, known_folders.KnownFolder.data)) orelse return error.DataDirNotFound;
-        defer allocator.free(root_dir);
-
-        const data_dir = try std.fs.path.joinZ(allocator, &.{ root_dir, name });
-        const cwd = std.Io.Dir.cwd();
-        try cwd.createDirPath(io, data_dir);
-
-        return .{ .title = name, .data_dir = data_dir, .allocator = allocator };
-    }
-
-    pub fn deinit(self: AppConfig) void {
-        self.allocator.free(self.data_dir);
-    }
-};
 
 const SpriteAnim = struct {
     rows: i32,
@@ -62,9 +37,6 @@ const SpriteAnim = struct {
 };
 
 pub fn main(init: std.process.Init) !void {
-    if (@import("builtin").os.tag == .windows) {
-        try dvui.Backend.Common.windowsAttachConsole();
-    }
 
     const fps = 60;
     const animation_speed = 6;
@@ -79,7 +51,6 @@ pub fn main(init: std.process.Init) !void {
     rl.setConfigFlags(.{
         .borderless_windowed_mode = true,
         .vsync_hint = true,
-        // .window_hidden = dvui.accesskit_enabled,
         .window_mouse_passthrough = true,
         .window_unfocused = true,
         .window_maximized = true,
@@ -93,13 +64,8 @@ pub fn main(init: std.process.Init) !void {
     rl.initWindow(800, 600, app_conf.title);
     defer rl.closeWindow();
 
-    var backend = RaylibBackend.init(init.io, init.gpa);
-    defer backend.deinit();
 
-    var win = try dvui.Window.init(@src(), init.gpa, backend.backend(), .{});
-    defer win.deinit();
 
-    // Make sure window is maximized
     rl.minimizeWindow();
     rl.restoreWindow();
     rl.setTargetFPS(fps);
@@ -120,7 +86,6 @@ pub fn main(init: std.process.Init) !void {
     var frames_counters: u32 = 0;
 
     while (!rl.windowShouldClose()) {
-        // frame work
         frames_counters += 1;
         if (frames_counters >= (fps / animation_speed)) {
             frames_counters = 0;
@@ -133,16 +98,12 @@ pub fn main(init: std.process.Init) !void {
         {
             rl.clearBackground(bg_color);
 
-            try win.begin(win.backend.nanoTime());
-            {
-                var b = dvui.box(@src(), .{}, .{ .expand = .horizontal, .margin = .{ .x = 10, .y = 10 } });
-                defer b.deinit();
-
-                dvui.label(@src(), "dvui works!", .{}, .{});
-            }
-            _ = try win.end(.{ .manage_backend = false });
-
-            rl.drawRectangleLines(border_margin, border_margin, rl.getRenderWidth() - border_margin, rl.getRenderHeight() - border_margin, .red);
+            rl.drawRectangleLines(
+                border_margin,
+                border_margin,
+                rl.getRenderWidth() - border_margin,
+                rl.getRenderHeight() - border_margin, .red
+            );
 
             scarfy.draw(scarfy_pos, .white);
             slime.draw(slime_pos, .white);
