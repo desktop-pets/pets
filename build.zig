@@ -36,6 +36,13 @@ pub fn build(b: *std.Build) !void {
         exe.root_module.addImport("dvui", dvui_dep.module("dvui_raylib_zig"));
         exe.root_module.addImport("raylib-zig-backend", dvui_dep.module("raylib_zig")); // for zls
 
+        const known_folders = b.dependency("known_folders", .{
+            .target = target,
+            .optimize = optimize,
+        }).module("known-folders");
+
+        exe.root_module.addImport("known-folders", known_folders);
+
         const compile_step = b.step("compile-" ++ name, "Compile " ++ name);
         compile_step.dependOn(&b.addInstallArtifact(exe, .{}).step);
         b.getInstallStep().dependOn(compile_step);
