@@ -18,7 +18,7 @@ const AppConfig = struct {
         const root_dir = (try known_folders.getPath(io, allocator, environ, known_folders.KnownFolder.data)) orelse return error.DataDirNotFound;
         defer allocator.free(root_dir);
 
-        const data_dir = try std.fs.path.joinZ(allocator, &.{ root_dir, app_name });
+        const data_dir = try std.fs.path.joinZ(allocator, &.{ root_dir, name });
         const cwd = std.Io.Dir.cwd();
         try cwd.createDirPath(io, data_dir);
 
@@ -53,16 +53,13 @@ const SpriteAnim = struct {
     }
     pub fn advance(self: *SpriteAnim) void {
         self.frame_idx = @rem(self.frame_idx + 1, self.frame_count);
-    }
-    pub fn draw(self: *SpriteAnim, position: rl.Vector2, tint: rl.Color) void {
         self.frame_rect.x = @as(f32, @floatFromInt(@rem(self.frame_idx, self.cols))) * self.frame_rect.width;
         self.frame_rect.y = @as(f32, @floatFromInt(@divFloor(self.frame_idx, self.cols))) * self.frame_rect.height;
+    }
+    pub fn draw(self: *SpriteAnim, position: rl.Vector2, tint: rl.Color) void {
         self.texture.drawRec(self.frame_rect, position, tint);
     }
 };
-
-const app_name = "Desktop Pets";
-const window_icon_png = @embedFile("zig-favicon.png");
 
 pub fn main(init: std.process.Init) !void {
     if (@import("builtin").os.tag == .windows) {
@@ -70,7 +67,11 @@ pub fn main(init: std.process.Init) !void {
     }
 
     const fps = 60;
+    const animation_speed = 6;
+    const bg_color = rl.colorAlpha(.black, 0.0);
+    const border_margin = 1;
     const arena: std.mem.Allocator = init.arena.allocator();
+
     const app_conf = try AppConfig.init(arena, init.io, init.environ_map, "Desktop Pets");
     defer app_conf.deinit();
     std.debug.print("Data Directory: '{s}'\n", .{app_conf.data_dir});
@@ -98,12 +99,10 @@ pub fn main(init: std.process.Init) !void {
     var win = try dvui.Window.init(@src(), init.gpa, backend.backend(), .{});
     defer win.deinit();
 
-    const bg_color = rl.colorAlpha(.black, 0.0);
-    const border_margin = 1;
-
     // Make sure window is maximized
     rl.minimizeWindow();
     rl.restoreWindow();
+    rl.setTargetFPS(fps);
 
     const scarfy_path = try std.fs.path.joinZ(arena, &.{ app_conf.data_dir, "scarfy.png" });
     var scarfy: SpriteAnim = try .init(scarfy_path, 6, 1, 6);
@@ -119,14 +118,11 @@ pub fn main(init: std.process.Init) !void {
     const slime_pos = rl.Vector2.init(270.0, 420.0);
 
     var frames_counters: u32 = 0;
-    const frames_speed = 6;
-
-    rl.setTargetFPS(fps);
 
     while (!rl.windowShouldClose()) {
         // frame work
         frames_counters += 1;
-        if (frames_counters >= (fps / frames_speed)) {
+        if (frames_counters >= (fps / animation_speed)) {
             frames_counters = 0;
             scarfy.advance();
             scarfy_pos.x = @rem(scarfy_pos.x + 10, @as(f32, @floatFromInt(rl.getRenderWidth())));
@@ -150,8 +146,6 @@ pub fn main(init: std.process.Init) !void {
 
             scarfy.draw(scarfy_pos, .white);
             slime.draw(slime_pos, .white);
-
-            rl.drawRectangle(100, 100, 100, 100, .sky_blue);
         }
         rl.endDrawing();
     }
