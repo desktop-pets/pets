@@ -32,36 +32,69 @@ pub fn main(init: std.process.Init) !void {
     rl.initWindow(800, 600, "Desktop Pets");
     defer rl.closeWindow();
 
+    const monitor = rl.getCurrentMonitor();
+    rl.setWindowSize(rl.getMonitorWidth(monitor), rl.getMonitorHeight(monitor) - 1);
+
     var backend = RaylibBackend.init(init.io, init.gpa);
     defer backend.deinit();
 
     var win = try dvui.Window.init(@src(), init.gpa, backend.backend(), .{});
     defer win.deinit();
 
-    const bg_color = rl.colorAlpha(.black, 0.0);
-    const border_margin = 1;
-
-    // Make sure window is maximized
+    const bgColor = rl.colorAlpha(.black, 0.2);
     rl.minimizeWindow();
     rl.restoreWindow();
 
+    const position = rl.Vector2.init(350.0, 280.0);
+    const scarfy = try rl.Texture.init("scarfy.png");
+    defer rl.unloadTexture(scarfy);
+
+    var frameRec = rl.Rectangle{
+        .width = @as(f32, @floatFromInt(@divFloor(scarfy.width, 7))),
+        .height = @as(f32, @floatFromInt(scarfy.height)),
+        .x = 100,
+        .y = 100,
+    };
+
+    var currentFrame: u32 = 0;
+    var framesCounters: u32 = 0;
+    const framesSpeed = 8;
+
+    rl.setTargetFPS(60);
+
+    std.debug.print("before loop", .{});
     while (!rl.windowShouldClose()) {
+
+        // frame work
+        framesCounters += 1;
+        if (framesCounters >= (60 / framesSpeed)) {
+            framesCounters = 0;
+            currentFrame += 1;
+
+            if (currentFrame > 5) {
+                currentFrame = 0;
+            }
+
+            frameRec.x = @as(f32, @floatFromInt(currentFrame)) * @as(f32, @floatFromInt(@divFloor(scarfy.width, 6)));
+        }
+
         rl.beginDrawing();
-        rl.clearBackground(bg_color);
+        defer rl.endDrawing();
+
+        rl.clearBackground(bgColor);
 
         try win.begin(win.backend.nanoTime());
         {
-            var b = dvui.box(@src(), .{}, .{ .expand = .horizontal, .margin = .{ .x = 10, .y = 10 } });
+            var b = dvui.box(@src(), .{}, .{ .expand = .horizontal, .margin = .{ .x = 10 } });
             defer b.deinit();
 
             dvui.label(@src(), "dvui works!", .{}, .{});
         }
 
-        rl.drawRectangleLines(border_margin, border_margin, rl.getRenderWidth() - border_margin, rl.getRenderHeight() - border_margin, .red);
+        rl.drawRectangleLines(0, 0, rl.getRenderWidth() - 5, rl.getRenderHeight() - 5, .red);
         _ = try win.end(.{ .manage_backend = false });
 
-        rl.drawRectangle(100, 100, 100, 100, .sky_blue);
+        scarfy.drawRec(frameRec, position, .white); // Draw part of the texture
 
-        rl.endDrawing();
     }
 }
